@@ -1,0 +1,18 @@
+﻿e5cdbd4 Merge main into final-subh: Resolved conflicts by accepting main changes
+8f99c3d WIP on main: 7defd86 Fix: Update to Gemini 2.5 Flash and fix db.ts null handling
+1207cf3 index on main: 7defd86 Fix: Update to Gemini 2.5 Flash and fix db.ts null handling
+7defd86 Fix: Update to Gemini 2.5 Flash and fix db.ts null handling
+dea5bee Merge pull request #4 from sandy191020/dev-alwin
+b9b47ee feat: Add CYBER background to AI Scanner card
+cee3fb7 Merge pull request #3 from sandy191020/dev-alwin
+afde008 Merge branch 'main' into dev-alwin
+3ae680d feat: Add Supabase authentication, update UI details, and fix logout
+a100092 Merge pull request #2 from sandy191020/devtiwari
+bb5c842 Merge branch 'main' into devtiwari
+705b104 feat: redesign dashboard layout with animations and add download report functionality
+2ea4d43 Merge pull request #1 from sandy191020/dev-alwin
+d192bea feat(auth): refactor sign-in to email/password and add local file scan option
+fa92412 feat: Implement core project structure including NodeGoat, vulnerability assessment backend, and frontend scanning UI.
+ba8a400 Merge subharup-dev into main
+c698327 Initial commit: VulnGuard AI MVP with Next.js and FastAPI
+7129576 Initial commit of Next.js setup and dashboard design

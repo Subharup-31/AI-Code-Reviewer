@@ -1,0 +1,11 @@
+﻿c698327 HEAD@{0}: checkout: moving from final-subh to subharup-dev
+e5cdbd4 HEAD@{1}: commit (merge): Merge main into final-subh: Resolved conflicts by accepting main changes
+7defd86 HEAD@{2}: pull origin subharup-dev: Fast-forward
+c698327 HEAD@{3}: checkout: moving from subharup-dev to final-subh
+c698327 HEAD@{4}: checkout: moving from main to subharup-dev
+7defd86 HEAD@{5}: reset: moving to HEAD
+7defd86 HEAD@{6}: commit: Fix: Update to Gemini 2.5 Flash and fix db.ts null handling
+fa92412 HEAD@{7}: commit: feat: Implement core project structure including NodeGoat, vulnerability assessment backend, and frontend scanning UI.
+ba8a400 HEAD@{8}: commit (merge): Merge subharup-dev into main
+7129576 HEAD@{9}: checkout: moving from subharup-dev to main
+c698327 HEAD@{10}: commit (initial): Initial commit: VulnGuard AI MVP with Next.js and FastAPI

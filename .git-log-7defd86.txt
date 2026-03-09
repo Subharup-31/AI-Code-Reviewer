@@ -1,0 +1,6 @@
+﻿* 7defd86 Fix: Update to Gemini 2.5 Flash and fix db.ts null handling
+* fa92412 feat: Implement core project structure including NodeGoat, vulnerability assessment backend, and frontend scanning UI.
+*   ba8a400 Merge subharup-dev into main
+|\  
+| * c698327 Initial commit: VulnGuard AI MVP with Next.js and FastAPI
+* 7129576 Initial commit of Next.js setup and dashboard design
