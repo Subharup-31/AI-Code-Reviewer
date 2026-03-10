@@ -8,136 +8,217 @@ import httpx
 NVD_API_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 NVD_API_KEY = os.getenv("NVD_API_KEY", "")
 
-# Fallback mappings for common vulnerability types when API is unavailable
+# Fallback mappings for common vulnerability types when NVD API is unavailable.
+# CVE IDs are omitted here — we do NOT assign a specific product CVE to a generic
+# vulnerability class, as that would be misleading in the report.  Instead we
+# reference the authoritative CWE entry and a representative CVSS base score
+# derived from the CVSS v3.1 specification for that weakness class.
 FALLBACK_CVE_MAP = {
     "sql injection": {
-        "cve_id": "CVE-2023-32315",
-        "description": "SQL Injection vulnerability allowing unauthorized data access",
-        "cvss_score": 9.8,
+        "cve_id": "N/A",
+        "description": "CWE-89: SQL Injection — unsanitised input is incorporated into a SQL query, allowing an attacker to read, modify or delete database records and, in some configurations, execute OS commands.",
+        "cvss_score": 9.8,   # CVSS v3.1 AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H
+        "cwe": "CWE-89",
     },
     "xss": {
-        "cve_id": "CVE-2023-29489",
-        "description": "Cross-Site Scripting (XSS) vulnerability allowing script injection",
-        "cvss_score": 6.1,
+        "cve_id": "N/A",
+        "description": "CWE-79: Cross-Site Scripting (XSS) — attacker-controlled data is rendered as HTML/JavaScript in a victim's browser, enabling session hijacking, phishing or defacement.",
+        "cvss_score": 6.1,   # CVSS v3.1 AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N
+        "cwe": "CWE-79",
     },
     "cross-site scripting": {
-        "cve_id": "CVE-2023-29489",
-        "description": "Cross-Site Scripting (XSS) vulnerability allowing script injection",
+        "cve_id": "N/A",
+        "description": "CWE-79: Cross-Site Scripting (XSS) — attacker-controlled data is rendered as HTML/JavaScript in a victim's browser, enabling session hijacking, phishing or defacement.",
         "cvss_score": 6.1,
+        "cwe": "CWE-79",
     },
     "hardcoded secret": {
-        "cve_id": "CVE-2023-35078",
-        "description": "Exposure of sensitive credentials in source code",
-        "cvss_score": 7.5,
+        "cve_id": "N/A",
+        "description": "CWE-798: Use of Hard-coded Credentials — a secret (password, API key, token) is embedded in source code, making it trivially extractable from the repository or binary.",
+        "cvss_score": 7.5,   # CVSS v3.1 AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N
+        "cwe": "CWE-798",
     },
     "hardcoded password": {
-        "cve_id": "CVE-2023-35078",
-        "description": "Hardcoded credentials enabling unauthorized access",
+        "cve_id": "N/A",
+        "description": "CWE-259: Use of Hard-coded Password — a password is embedded directly in the code, enabling anyone with source or binary access to authenticate as that principal.",
         "cvss_score": 7.5,
+        "cwe": "CWE-259",
     },
     "insecure deserialization": {
-        "cve_id": "CVE-2023-34362",
-        "description": "Insecure deserialization leading to remote code execution",
+        "cve_id": "N/A",
+        "description": "CWE-502: Deserialization of Untrusted Data — deserialising attacker-controlled bytes can trigger arbitrary code execution, denial of service or privilege escalation.",
         "cvss_score": 9.8,
+        "cwe": "CWE-502",
     },
     "command injection": {
-        "cve_id": "CVE-2023-27997",
-        "description": "OS command injection allowing arbitrary command execution",
+        "cve_id": "N/A",
+        "description": "CWE-78: OS Command Injection — user-supplied input is passed to a shell without sanitisation, allowing an attacker to execute arbitrary operating-system commands.",
         "cvss_score": 9.8,
+        "cwe": "CWE-78",
     },
     "path traversal": {
-        "cve_id": "CVE-2023-24955",
-        "description": "Path traversal allowing unauthorized file access",
-        "cvss_score": 7.2,
+        "cve_id": "N/A",
+        "description": "CWE-22: Path Traversal — insufficient validation of file paths allows an attacker to read or write files outside the intended directory.",
+        "cvss_score": 7.5,
+        "cwe": "CWE-22",
     },
     "insecure authentication": {
-        "cve_id": "CVE-2023-20198",
-        "description": "Authentication bypass vulnerability",
-        "cvss_score": 8.6,
+        "cve_id": "N/A",
+        "description": "CWE-287: Improper Authentication — the application does not correctly verify the identity of a user or system, enabling bypass of authentication controls.",
+        "cvss_score": 8.1,
+        "cwe": "CWE-287",
     },
     "unsafe file handling": {
-        "cve_id": "CVE-2023-23397",
-        "description": "Unsafe file operations leading to potential code execution",
-        "cvss_score": 7.8,
+        "cve_id": "N/A",
+        "description": "CWE-73: External Control of File Name or Path — an attacker can influence file operations to read, overwrite or delete unintended files.",
+        "cvss_score": 7.5,
+        "cwe": "CWE-73",
+    },
+    "open redirect": {
+        "cve_id": "N/A",
+        "description": "CWE-601: URL Redirection to Untrusted Site ('Open Redirect') — the application redirects users to an attacker-controlled URL, facilitating phishing attacks.",
+        "cvss_score": 6.1,
+        "cwe": "CWE-601",
+    },
+    "ssrf": {
+        "cve_id": "N/A",
+        "description": "CWE-918: Server-Side Request Forgery (SSRF) — the server fetches a URL supplied by the user, allowing access to internal services or cloud metadata APIs.",
+        "cvss_score": 8.6,
+        "cwe": "CWE-918",
+    },
+    "insecure random": {
+        "cve_id": "N/A",
+        "description": "CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator — predictable random values undermine security tokens, session IDs or cryptographic material.",
+        "cvss_score": 5.9,
+        "cwe": "CWE-338",
+    },
+    "weak cryptography": {
+        "cve_id": "N/A",
+        "description": "CWE-327: Use of a Broken or Risky Cryptographic Algorithm — deprecated algorithms (MD5, SHA-1, DES) provide inadequate protection against modern attacks.",
+        "cvss_score": 7.5,
+        "cwe": "CWE-327",
+    },
+    "xxe": {
+        "cve_id": "N/A",
+        "description": "CWE-611: XML External Entity (XXE) Injection — an XML parser processes external entity references, enabling file disclosure or SSRF.",
+        "cvss_score": 8.1,
+        "cwe": "CWE-611",
     },
 }
 
 
-async def map_to_cve(vulnerability_type: str) -> dict:
-    """
-    Map a vulnerability type string to a known CVE entry.
-    First tries the NVD API, falls back to local mapping.
-    """
-    vuln_lower = vulnerability_type.lower()
+def _parse_nvd_response(data: dict) -> dict | None:
+    """Extract a structured result from a raw NVD API response dict."""
+    vulns = data.get("vulnerabilities", [])
+    if not vulns:
+        return None
 
+    nvd_context_parts = []
+    primary_cve = None
+    primary_desc = "No description available"
+    primary_cvss = 0.0
+
+    for i, vuln_item in enumerate(vulns[:5]):
+        cve_item = vuln_item.get("cve", {})
+        cve_id = cve_item.get("id", "N/A")
+
+        descriptions = cve_item.get("descriptions", [])
+        desc = next(
+            (d["value"] for d in descriptions if d.get("lang") == "en"),
+            "No description available",
+        )
+
+        metrics = cve_item.get("metrics", {})
+        cvss_score = 0.0
+        for version in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
+            if version in metrics and metrics[version]:
+                cvss_score = metrics[version][0].get("cvssData", {}).get("baseScore", 0.0)
+                break
+
+        nvd_context_parts.append(f"- {cve_id} (CVSS: {cvss_score}): {desc}")
+
+        if i == 0:
+            primary_cve = cve_id
+            primary_desc = desc
+            primary_cvss = cvss_score
+
+    if not primary_cve:
+        return None
+
+    return {
+        "cve_id": primary_cve,
+        "description": primary_desc[:200],
+        "cvss_score": primary_cvss,
+        "nvd_context": "\n".join(nvd_context_parts),
+    }
+
+
+async def _query_nvd(params: dict, headers: dict) -> dict | None:
+    """Fire a single NVD API request and return a parsed result or None."""
     try:
-        params = {"keywordSearch": vulnerability_type, "resultsPerPage": 5}
-        headers = {}
-        if NVD_API_KEY:
-            headers["apiKey"] = NVD_API_KEY
-
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(NVD_API_BASE, params=params, headers=headers)
-
             if response.status_code == 200:
-                data = response.json()
-                vulns = data.get("vulnerabilities", [])
-
-                if vulns:
-                    nvd_context_parts = []
-                    primary_cve = None
-                    primary_desc = "No description available"
-                    primary_cvss = 0.0
-
-                    for i, vuln_item in enumerate(vulns):
-                        cve_item = vuln_item.get("cve", {})
-                        cve_id = cve_item.get("id", "N/A")
-
-                        descriptions = cve_item.get("descriptions", [])
-                        desc = next(
-                            (d["value"] for d in descriptions if d.get("lang") == "en"),
-                            "No description available",
-                        )
-
-                        # Extract CVSS score
-                        metrics = cve_item.get("metrics", {})
-                        cvss_score = 0.0
-                        for version in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
-                            if version in metrics and metrics[version]:
-                                cvss_data = metrics[version][0].get("cvssData", {})
-                                cvss_score = cvss_data.get("baseScore", 0.0)
-                                break
-                        
-                        nvd_context_parts.append(f"- {cve_id} (CVSS: {cvss_score}): {desc}")
-
-                        if i == 0:
-                            primary_cve = cve_id
-                            primary_desc = desc
-                            primary_cvss = cvss_score
-
-                    nvd_context = "\n".join(nvd_context_parts)
-
-                    if primary_cve:
-                        return {
-                            "cve_id": primary_cve,
-                            "description": primary_desc[:200],
-                            "cvss_score": primary_cvss,
-                            "nvd_context": nvd_context
-                        }
+                return _parse_nvd_response(response.json())
     except Exception as e:
         print(f"[!] NVD API error: {e}")
+    return None
 
-    # Fallback to local mapping
+
+async def map_to_cve(vulnerability_type: str, cwe_ids: list[str] | None = None) -> dict:
+    """
+    Map a vulnerability finding to CVE / CWE context.
+
+    Strategy (in order):
+    1. Query NVD by CWE ID(s) from scanner metadata — most precise signal.
+    2. Fall back to keyword text search — broad but can return unrelated CVEs.
+    3. Fall back to local FALLBACK_CVE_MAP — CWE-based, always accurate.
+    4. Return a minimal N/A entry if nothing matches.
+    """
+    headers = {"apiKey": NVD_API_KEY} if NVD_API_KEY else {}
+    vuln_lower = vulnerability_type.lower()
+
+    # ── 1. CWE-based NVD lookup (most accurate) ────────────────────────────────
+    # Semgrep annotates every finding with CWE IDs.  Querying NVD by CWE returns
+    # CVEs that are genuinely about that weakness class, not random product CVEs.
+    if cwe_ids:
+        for cwe_id in cwe_ids:
+            # Normalise: accept "CWE-89" or "89"
+            cwe_num = cwe_id.upper().replace("CWE-", "").strip()
+            if not cwe_num.isdigit():
+                continue
+            result = await _query_nvd(
+                {"cweId": f"CWE-{cwe_num}", "resultsPerPage": 5},
+                headers,
+            )
+            if result:
+                print(f"[cve_mapper] CWE-{cwe_num} → {result['cve_id']} (CVSS {result['cvss_score']})")
+                return result
+
+    # ── 2. Keyword fallback (less precise) ────────────────────────────────────
+    result = await _query_nvd(
+        {"keywordSearch": vulnerability_type, "resultsPerPage": 5},
+        headers,
+    )
+    if result:
+        print(f"[cve_mapper] keyword '{vulnerability_type}' → {result['cve_id']}")
+        return result
+
+    # ── 3. Local CWE-based map (always accurate, no network) ──────────────────
     for key, value in FALLBACK_CVE_MAP.items():
         if key in vuln_lower:
             return {
                 **value,
-                "nvd_context": f"- {value['cve_id']} (CVSS: {value['cvss_score']}): {value['description']}"
+                "nvd_context": f"- {value['cve_id']} (CVSS: {value['cvss_score']}): {value['description']}",
             }
 
+    # ── 4. Unknown / custom business-logic flaw ────────────────────────────────
     return {
         "cve_id": "N/A",
-        "description": f"No CVE mapping found for: {vulnerability_type}",
+        "description": f"No CVE/CWE mapping found for: {vulnerability_type}",
         "cvss_score": 5.0,
-        "nvd_context": f"- N/A: No related CVE data found for {vulnerability_type} in the NVD database, possibly a zero-day or custom business logic flaw."
+        "nvd_context": (
+            f"- N/A: No related CVE data found for '{vulnerability_type}' in the NVD database. "
+            "This may be a custom business-logic flaw or a zero-day."
+        ),
     }

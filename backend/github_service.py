@@ -246,6 +246,109 @@ def cleanup_repo(repo_path: str) -> None:
     print(f"[+] Cleaned up: {repo_path}")
 
 
+def _parse_pr_url(pr_url: str) -> tuple[str, str, int]:
+    """
+    Extract owner, repo, and PR number from a GitHub PR URL.
+    Accepts: https://github.com/owner/repo/pull/123
+    """
+    url = pr_url.rstrip("/")
+    parts = url.split("/")
+    try:
+        pull_idx = parts.index("pull")
+        pr_number = int(parts[pull_idx + 1])
+        repo = parts[pull_idx - 1]
+        owner = parts[pull_idx - 2]
+        return owner, repo, pr_number
+    except (ValueError, IndexError):
+        raise ValueError(f"Cannot parse PR URL: {pr_url}. Expected format: https://github.com/owner/repo/pull/123")
+
+
+async def fetch_pr_files(pr_url: str) -> tuple[str, list[dict]]:
+    """
+    Fetch only the files changed in a GitHub Pull Request.
+
+    Returns:
+        (local_repo_path, changed_files_metadata)
+
+    Each entry in changed_files_metadata contains:
+        - filename: relative path
+        - patch: unified diff of the changed lines
+        - additions: number of lines added
+        - deletions: number of lines removed
+        - status: 'added' | 'modified' | 'removed' | 'renamed'
+
+    This mirrors how CodeRabbit works — scan only what changed, with full
+    file context from disk so the AI sees the complete function, not just the diff.
+    """
+    owner, repo, pr_number = _parse_pr_url(pr_url)
+    local_path = os.path.join(CLONE_BASE_DIR, f"{repo}_pr{pr_number}")
+    _force_rmtree(local_path)
+    os.makedirs(local_path, exist_ok=True)
+
+    print(f"[+] Fetching PR #{pr_number} files: {owner}/{repo}")
+
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "VulnGuard-AI",
+    }
+    github_token = os.getenv("GITHUB_TOKEN", "")
+    if github_token:
+        headers["Authorization"] = f"token {github_token}"
+
+    timeout = httpx.Timeout(connect=30.0, read=120.0, write=30.0, pool=30.0)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        # ── Get list of changed files with diff patches ────────────────────
+        files_url = f"https://api.github.com/repos/{owner}/{repo}/pulls/{pr_number}/files"
+        files_resp = await client.get(files_url, headers=headers)
+        if files_resp.status_code == 404:
+            raise Exception(f"PR not found: {owner}/{repo}#{pr_number}")
+        if files_resp.status_code != 200:
+            raise Exception(f"GitHub API error ({files_resp.status_code}): {files_resp.text[:200]}")
+
+        changed_files = files_resp.json()
+        print(f"[+] PR #{pr_number} changed {len(changed_files)} files")
+
+        # ── Download full content of each changed file ─────────────────────
+        # We need the full file (not just the diff patch) so the AI gets
+        # complete function context rather than just the changed lines.
+        downloaded = 0
+        for file_info in changed_files:
+            filename = file_info.get("filename", "")
+            status = file_info.get("status", "modified")
+
+            if status == "removed":
+                continue  # File was deleted — nothing to scan
+
+            ext = os.path.splitext(filename)[1].lower()
+            basename = os.path.basename(filename)
+            if ext not in SUPPORTED_EXTENSIONS and basename not in INCLUDE_FILENAMES:
+                continue
+
+            size = file_info.get("blob_url", "")  # blob_url available for size check
+            # Fetch full file content
+            file_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{filename}"
+            file_resp = await client.get(file_url, headers=headers)
+            if file_resp.status_code != 200:
+                continue
+
+            file_data = file_resp.json()
+            content_b64 = file_data.get("content", "")
+            if not content_b64:
+                continue
+
+            content = base64.b64decode(content_b64).decode("utf-8", errors="ignore")
+            local_file_path = os.path.join(local_path, filename)
+            os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
+            with open(local_file_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            downloaded += 1
+
+        print(f"[+] Downloaded {downloaded} changed files to {local_path}")
+
+    return local_path, changed_files
+
+
 async def _get_github_headers(owner: str, repo: str) -> dict:
     """
     Generates GitHub API headers. Uses a GitHub App token if credentials
